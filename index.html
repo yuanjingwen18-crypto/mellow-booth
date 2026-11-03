@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mellow Booth. — Your Little Photo Studio</title>
+<style>
+:root{--pink:#D9A7AF;--pink2:#F3DDE0;--cream:#F8F3ED;--ink:#625253;--muted:#A99594;--line:#EADDD8;}
+*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:999px;padding:11px 17px;background:var(--pink);color:white;font-weight:650;transition:.18s}button:hover{filter:brightness(.96);transform:translateY(-1px)}button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.secondary{background:white;color:var(--ink);border:1px solid var(--line)}.soft{background:var(--pink2);color:#a65f76}.tiny{padding:8px 12px;font-size:13px}
+header{display:flex;align-items:center;justify-content:space-between;padding:20px clamp(18px,5vw,70px);border-bottom:1px solid #f0e7e5;background:#fffaf5ee;position:sticky;top:0;z-index:4;backdrop-filter:blur(12px)}
+.logo{font-family:Georgia,serif;font-size:25px;letter-spacing:.4px;color:#bd7188}.logo small{display:block;font:9px Arial;letter-spacing:3px;color:#a99a9d;margin-top:3px}
+nav{display:flex;gap:18px;font-size:13px;color:var(--muted)}nav span{cursor:pointer}
+main{max-width:1160px;margin:auto;padding:36px 22px 70px}
+.hero{text-align:center;padding:30px 10px 36px}.eyebrow{font-size:11px;letter-spacing:3px;color:#c27c91;font-weight:700}.hero h1{font-family:Georgia,serif;font-size:clamp(36px,6vw,62px);font-weight:500;margin:12px 0 8px;color:#5a454c}.hero p{color:var(--muted);font-size:14px;line-height:1.7;margin:0 auto 20px;max-width:520px}
+.workspace{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.85fr);gap:22px;align-items:start}
+.panel{background:white;border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 12px 35px #72545a0a}.panel h2{font-size:16px;margin:0 0 15px}.camera-wrap{background:#302a2c;border-radius:16px;overflow:hidden;position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
+video{width:100%;height:100%;object-fit:cover;display:none;transform:scaleX(-1)}#empty{color:#fff;text-align:center;padding:25px}#empty .cam-icon{font-size:38px}#empty p{font-size:13px;color:#e9dfe1;line-height:1.6}
+#countdown{position:absolute;color:white;font-size:78px;font-weight:800;text-shadow:0 3px 20px #0008;display:none}
+.controls{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.upload-label{display:inline-flex;align-items:center;gap:7px}
+.status{font-size:12px;color:var(--muted);margin-top:10px;min-height:18px}
+.section{padding-top:18px;margin-top:18px;border-top:1px solid #f2e9e9}.section-title{font-size:13px;font-weight:750;margin-bottom:11px;display:flex;justify-content:space-between}
+.options{display:flex;gap:8px;flex-wrap:wrap}.chip{background:#fff;color:#786b6e;border:1px solid var(--line);padding:8px 12px;font-size:12px}.chip.active{background:#f8e7ec;color:#a65f76;border-color:#e9bfcb}
+.slider-row{display:grid;grid-template-columns:72px 1fr 34px;gap:8px;align-items:center;font-size:12px;color:#7e7174;margin:11px 0}.slider-row input{width:100%;accent-color:var(--pink)}
+.preview-area{display:flex;justify-content:center;align-items:flex-start;min-height:300px;background:#fbf6f3;border-radius:16px;padding:18px;overflow:auto}
+#resultCanvas{max-width:100%;height:auto;max-height:560px;box-shadow:0 8px 24px #6e51521c;background:white}
+.placeholder{font-size:13px;color:#aa9da0;text-align:center;align-self:center;line-height:1.8}
+.frame-note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}
+footer{text-align:center;color:#aa9da0;font-size:11px;padding:24px}
+@media(max-width:800px){.workspace{grid-template-columns:1fr}nav{display:none}main{padding-top:20px}.hero{padding-top:20px}.panel{padding:16px}}
+</style>
+</head>
+<body>
+<header><div class="logo">Mellow Booth.<small>YOUR LITTLE PHOTO STUDIO</small></div><nav><span onclick="scrollTo({top:0,behavior:'smooth'})">STUDIO</span><span onclick="document.getElementById('editor').scrollIntoView({behavior:'smooth'})">EDIT</span><span onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">ABOUT</span></nav><button class="tiny soft" onclick="resetAll()">重新开始 ↻</button></header>
+<main>
+<section class="hero"><div class="eyebrow">WELCOME TO MALLOW BOOTH PHOTO STUDIO</div><h1>Your Mellow Booth, forever.</h1><p>一个属于你的线上拍照空间。选择喜欢的滤镜与相框，记录每一个可爱的瞬间。</p><button onclick="document.getElementById('studio').scrollIntoView({behavior:'smooth'})">进入拍照亭　↓</button></section>
+<div class="workspace" id="studio">
+<section class="panel">
+<h2>01 / Camera Studio <span style="font-size:11px;color:#b5a8aa;font-weight:400">拍摄或上传照片</span></h2>
+<div class="camera-wrap"><video id="video" autoplay playsinline></video><div id="empty"><div class="cam-icon">♡</div><strong>Ready for your moment?</strong><p>开启摄像头，或上传一张喜欢的照片<br>建议使用光线充足的环境</p></div><div id="countdown"></div></div>
+<div class="controls"><button id="startCam">开启摄像头</button><button id="snap" disabled>拍一张</button><button class="secondary" id="stopCam" disabled>关闭摄像头</button><label class="secondary upload-label" style="border-radius:999px;padding:11px 15px;font-size:13px;font-weight:650;cursor:pointer">上传照片<input id="upload" type="file" accept="image/*" multiple hidden></label></div>
+<div class="status" id="cameraStatus">提示：首次使用需要允许浏览器访问摄像头。摄像头通常需要 HTTPS 或 localhost 环境。</div>
+<div class="section"><div class="section-title">拍摄模式 <span style="color:#aa9da0;font-weight:400">选择照片数量</span></div><div class="options"><div class="options">
+  <button class="chip active" data-count="1">单张</button>
+  <button class="chip" data-count="2">两张</button>
+  <button class="chip" data-count="4">四张连拍</button>
+  <button class="chip" data-count="6">六张连拍</button>
+</div>
+<div class="section"><div class="section-title">我的照片 <span id="photoCount" style="color:#aa9da0;font-weight:400">0 张</span></div><div id="thumbs" class="options"><span style="font-size:12px;color:#b4a8aa">拍摄或上传后，照片会显示在这里。</span></div><div class="controls"><button class="secondary tiny" id="clearPhotos">清空照片</button><button class="soft tiny" id="makePreview">更新成品预览</button></div></div>
+</section>
+<section class="panel" id="editor">
+<h2>02 / Photo Design <span style="font-size:11px;color:#b5a8aa;font-weight:400">编辑你的照片</span></h2>
+<div class="preview-area" id="previewArea"><div class="placeholder">你的成品会出现在这里 ♡<br>先拍摄或上传照片，再选择喜欢的设计。</div><canvas id="resultCanvas" width="600" height="1200" style="display:none"></canvas></div>
+<div class="section">
+  <div class="section-title">相框布局</div>
+  <div class="options">
+    <button class="chip active" data-layout="strip4">经典四格</button>
+    <button class="chip" data-layout="big4">大四格</button>
+    <button class="chip" data-layout="grid2">双格方形</button>
+    <button class="chip" data-layout="id6">证件照六格</button>
+  </div>
+</div>
+<div class="section">
+  <div class="section-title">相框 Frame</div>
+
+  <div class="options" id="cloudFrames">
+    <span style="font-size:12px;color:#b4a8aa">
+      正在加载相框...
+    </span>
+  </div>
+
+  <p class="frame-note" id="frameStatus">
+    选择喜欢的相框，为照片添加装饰。
+  </p>
+</div>
+<div class="section"><div class="section-title">滤镜 Filter</div><div class="options" id="filters"><button class="chip active" data-filter="normal">原图</button><button class="chip" data-filter="soft">奶油柔光</button><button class="chip" data-filter="film">日系胶片</button><button class="chip" data-filter="warm">暖调</button><button class="chip" data-filter="mono">黑白</button><button class="chip" data-filter="cool">清冷</button></div></div>
+<div class="options" id="cloudFilters">
+    <span style="font-size:12px;color:#aa9da0;">正在加载云端滤镜...</span>
+</div>
+<div class="section"><div class="section-title">美颜 & 光线 <span style="font-size:11px;color:#aa9da0;font-weight:400">基础效果</span></div>
+<div class="slider-row"><label>柔肤感</label><input id="smooth" type="range" min="0" max="60" value="12"><output id="smoothVal">12</output></div>
+<div class="slider-row"><label>亮度</label><input id="brightness" type="range" min="70" max="140" value="108"><output id="brightnessVal">108</output></div>
+<div class="slider-row"><label>对比度</label><input id="contrast" type="range" min="70" max="140" value="102"><output id="contrastVal">102</output></div>
+</div>
+<div class="section"><div class="section-title">相框颜色</div><div class="options"><button class="chip active" data-color="#fffaf5">奶油白</button><button class="chip" data-color="#f8e5eb">樱花粉</button><button class="chip" data-color="#dce8e2">薄荷绿</button><button class="chip" data-color="#29272b">经典黑</button></div></div>
+<div class="section"><div class="section-title">装饰贴纸</div><div class="options" id="stickers"><button class="chip" data-sticker="♡">♡ 爱心</button><button class="chip" data-sticker="✿">✿ 小花</button><button class="chip" data-sticker="★">★ 星星</button><button class="chip" data-sticker="୨୧">୨୧ 蝴蝶结</button><button class="chip" data-sticker="none">不添加</button></div><div class="frame-note">贴纸会出现在相框底部装饰区。此版本暂不支持拖动贴纸或人脸级 AI 瘦脸/磨皮。</div></div>
+<div class="section"><div class="section-title">照片文字</div><input id="caption" type="text" maxlength="35" placeholder="例如：a lovely day ♡" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;color:var(--ink);outline-color:#d98da2"><div class="frame-note">文字将显示在相框下方。</div></div>
+<div class="controls"><button id="download">下载高清照片 ↓</button><button class="secondary" id="refresh">重新生成预览</button></div>
+<p class="frame-note">隐私提示：此原型在浏览器本地处理照片，不会主动上传到服务器。请在自己的设备上使用，并避免在公共设备留下个人照片。</p>
+</section>
+</div>
+<section id="about" style="text-align:center;padding:45px 10px 0"><div class="eyebrow">MADE FOR YOUR MOMENTS</div><p style="font-family:Georgia,serif;font-size:22px;color:#795d66">Keep the moments you love.</p></section>
+</main><footer>Mellow Booth · A demo made with @WildRoseDiary</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+
+<script>
+const $=id=>document.getElementById(id);
+async function loadCloudFilters() {
+    const container = $('cloudFilters');
+
+    container.textContent = '正在加载云端滤镜...';
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('filters')
+            .select('id, name, file_path')
+            .eq('is_published', true)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        container.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            container.textContent = '暂时没有已发布的云端滤镜';
+            return;
+        }
+
+        data.forEach(item => {
+            const button = document.createElement('button');
+
+            button.className = 'chip';
+            button.textContent = item.name;
+            button.dataset.cloudFilter = item.id;
+
+            button.onclick = async () => {
+    document.querySelectorAll('[data-filter]').forEach(x => x.classList.remove('active'));
+    container.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+
+    button.classList.add('active');
+    selectedCloudFilter = item;
+    cloudLut = null;
+    filter = 'normal';
+
+    try {
+        container.querySelectorAll('button').forEach(b => b.disabled = true);
+
+        const { data } = supabaseClient
+            .storage
+            .from('filters')
+            .getPublicUrl(item.file_path);
+
+        const response = await fetch(data.publicUrl);
+
+        if (!response.ok) {
+            throw new Error('滤镜文件读取失败');
+        }
+
+        const cubeText = await response.text();
+        cloudLut = parseCube(cubeText);
+
+        renderResult();
+
+    } catch (error) {
+        console.error('云端滤镜应用失败：', error);
+        alert('滤镜加载失败：' + error.message);
+        cloudLut = null;
+    } finally {
+        container.querySelectorAll('button').forEach(b => b.disabled = false);
+    }
+};
+
+            container.appendChild(button);
+        });
+
+    } catch (error) {
+        console.error('云端滤镜加载失败：', error);
+        container.textContent = '云端滤镜加载失败：' + error.message;
+    }
+}
+let stream=null, photos=[], targetCount=1, layout='strip4', filter='normal', frameColor='#fffaf5', sticker='♡';
+let cloudFrames = [];
+let selectedCloudFilter = null;
+let selectedCloudFrame = null;
+let cloudLut = null;
+
+async function loadCloudFrames() {
+    const container = $('cloudFrames');
+    const status = $('frameStatus');
+
+    if (!container) return;
+
+    container.textContent = '正在加载相框...';
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('booth_assets')
+            .select('id, name, storage_path, layout')
+            .eq('asset_type', 'frame')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        cloudFrames = data || [];
+
+        if (cloudFrames.length === 0) {
+            container.textContent = '目前还没有可用的相框';
+            return;
+        }
+
+        container.innerHTML = '';
+
+        cloudFrames
+    .filter(frame => frame.layout === 'all' || frame.layout === layout)
+    .forEach(frame => {
+            const { data: publicData } = supabaseClient
+                .storage
+                .from('frames')
+                .getPublicUrl(frame.storage_path);
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'chip';
+
+            const preview = document.createElement('img');
+            preview.src = publicData.publicUrl;
+            preview.alt = frame.name;
+            preview.style.width = '64px';
+            preview.style.height = '64px';
+            preview.style.objectFit = 'contain';
+            preview.style.display = 'block';
+
+            const label = document.createElement('span');
+            label.textContent = frame.name;
+
+            button.appendChild(preview);
+            button.appendChild(label);
+
+            button.addEventListener('click', () => {
+                const frameImage = new Image();
+
+frameImage.onload = () => {
+    selectedCloudFrame = {
+        ...frame,
+        url: publicData.publicUrl,
+        img: frameImage
+    };
+
+    renderResult();
+};
+
+frameImage.onerror = () => {
+    status.textContent = '相框图片加载失败，请检查图片文件';
+};
+
+frameImage.src = publicData.publicUrl;
+
+                container.querySelectorAll('.chip').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+                button.classList.add('active');
+                status.textContent = '已选择相框：' + frame.name;
+            });
+
+            container.appendChild(button);
+        });
+
+        status.textContent = '已加载 ' + cloudFrames.length + ' 个相框';
+
+    } catch (error) {
+        console.error('读取相框失败：', error);
+        container.textContent = '相框加载失败';
+        status.textContent = '读取失败：' + error.message;
+    }
+}
+const video=$('video'), canvas=$('resultCanvas'), ctx=canvas.getContext('2d');
+const filterMap={normal:'none',soft:'saturate(1.05) brightness(1.08) contrast(.94)',film:'sepia(.18) saturate(.82) contrast(.92)',warm:'sepia(.13) saturate(1.18) brightness(1.04)',mono:'grayscale(1) contrast(1.05)',cool:'saturate(.82) hue-rotate(8deg) brightness(1.04)'};
+function setStatus(t){$('cameraStatus').textContent=t}
+async function startCamera(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});video.srcObject=stream;video.style.display='block';$('empty').style.display='none';$('snap').disabled=false;$('stopCam').disabled=false;$('startCam').disabled=true;setStatus('摄像头已开启。准备好后点击「拍一张」。')}catch(e){setStatus('无法开启摄像头：请检查浏览器权限，并确认使用 HTTPS 或 localhost。')}}
+function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}video.srcObject=null;video.style.display='none';$('empty').style.display='block';$('snap').disabled=true;$('stopCam').disabled=true;$('startCam').disabled=false;setStatus('摄像头已关闭。')}
+function countdown(n){return new Promise(resolve=>{let c=3;$('countdown').style.display='block';$('countdown').textContent=c;let timer=setInterval(()=>{c--;if(c>0)$('countdown').textContent=c;else{clearInterval(timer);$('countdown').style.display='none';resolve()}},700)})}
+function capture(){const c=document.createElement('canvas');c.width=video.videoWidth||640;c.height=video.videoHeight||480;c.getContext('2d').translate(c.width,0);c.getContext('2d').scale(-1,1);c.getContext('2d').drawImage(video,0,0,c.width,c.height);addPhoto(c.toDataURL('image/jpeg',.94))}
+async function takePhotos(){if(!stream)return; $('snap').disabled=true;for(let i=0;i<targetCount;i++){await countdown(3);capture();if(i<targetCount-1)await new Promise(r=>setTimeout(r,450))}$('snap').disabled=false;renderThumbs();renderResult()}
+function addPhoto(src){const img=new Image();img.onload=()=>{photos.push(img);renderThumbs();renderResult()};img.src=src}
+$('startCam').onclick=startCamera;$('stopCam').onclick=stopCamera;$('snap').onclick=takePhotos;
+$('upload').onchange=e=>{[...e.target.files].forEach(file=>{if(!file.type.startsWith('image/'))return;const reader=new FileReader();reader.onload=()=>addPhoto(reader.result);reader.readAsDataURL(file)});e.target.value=''};
+function renderThumbs(){$('photoCount').textContent=photos.length+' 张';$('thumbs').innerHTML='';photos.forEach((p,i)=>{const im=document.createElement('img');im.src=p.src;im.style.cssText='width:58px;height:58px;object-fit:cover;border-radius:10px;border:2px solid #f0e0e4';im.title='第'+(i+1)+'张';$('thumbs').appendChild(im)})}
+$('clearPhotos').onclick=()=>{photos=[];renderThumbs();canvas.style.display='none';$('previewArea').querySelector('.placeholder').style.display='block';$('previewArea').querySelector('.placeholder').textContent='你的成品会出现在这里 ♡\\n先拍摄或上传照片，再选择喜欢的设计。'};
+document.querySelectorAll('[data-count]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-count]').forEach(x=>x.classList.remove('active'));b.classList.add('active');targetCount=+b.dataset.count});
+document.querySelectorAll('[data-layout]').forEach(b => {
+    b.onclick = () => {
+        document.querySelectorAll('[data-layout]').forEach(x => {
+            x.classList.remove('active');
+        });
+
+        b.classList.add('active');
+        layout = b.dataset.layout;
+
+        // 如果当前相框不适合新布局，就取消选择
+        if (
+            selectedCloudFrame &&
+            selectedCloudFrame.layout !== 'all' &&
+            selectedCloudFrame.layout !== layout
+        ) {
+            selectedCloudFrame = null;
+        }
+
+        // 重新显示适合当前布局的相框
+        loadCloudFrames();
+
+        // 重新生成照片预览
+        renderResult();
+    };
+});
+document.querySelectorAll('[data-filter]').forEach(b => {
+    b.onclick = () => {
+        document.querySelectorAll('[data-filter]').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('#cloudFilters button').forEach(x => x.classList.remove('active'));
+
+        b.classList.add('active');
+        filter = b.dataset.filter;
+        selectedCloudFilter = null;
+        cloudLut = null;
+
+        renderResult();
+    };
+});
+document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-color]').forEach(x=>x.classList.remove('active'));b.classList.add('active');frameColor=b.dataset.color;renderResult()});
+document.querySelectorAll('[data-sticker]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-sticker]').forEach(x=>x.classList.remove('active'));b.classList.add('active');sticker=b.dataset.sticker;renderResult()});
+['smooth','brightness','contrast'].forEach(id=>$(id).oninput=()=>{$(id+'Val').value=$(id).value;renderResult()});
+$('caption').oninput=renderResult;$('makePreview').onclick=renderResult;$('refresh').onclick=renderResult;
+function drawCrop(img, x, y, w, h) {
+    const iw = img.width;
+    const ih = img.height;
+    const scale = Math.max(w / iw, h / ih);
+    const sw = w / scale;
+    const sh = h / scale;
+    const sx = (iw - sw) / 2;
+    const sy = (ih - sh) / 2;
+
+    // 创建临时画布
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = Math.round(w);
+    tempCanvas.height = Math.round(h);
+
+    const tempCtx = tempCanvas.getContext('2d');
+
+    // 先绘制基础照片和内置滤镜
+    const baseFilter = filterMap[filter] === 'none'
+        ? ''
+        : filterMap[filter];
+
+    tempCtx.filter =
+        baseFilter +
+        ' brightness(' + (Number($('brightness').value) / 100) + ')' +
+        ' contrast(' + (Number($('contrast').value) / 100) + ')';
+
+    tempCtx.drawImage(
+        img, sx, sy, sw, sh,
+        0, 0, tempCanvas.width, tempCanvas.height
+    );
+
+    tempCtx.filter = 'none';
+
+    // 添加磨皮效果
+    const sm = Number($('smooth').value);
+
+    if (sm > 0) {
+        tempCtx.save();
+        tempCtx.globalAlpha = sm / 500;
+        tempCtx.filter = 'blur(5px)';
+
+        tempCtx.drawImage(
+            img, sx, sy, sw, sh,
+            0, 0, tempCanvas.width, tempCanvas.height
+        );
+
+        tempCtx.restore();
+    }
+
+    // 应用云端 LUT 滤镜
+    if (cloudLut) {
+        const imageData = tempCtx.getImageData(
+            0, 0,
+            tempCanvas.width,
+            tempCanvas.height
+        );
+
+        applyCubeLut(imageData, cloudLut);
+
+        tempCtx.putImageData(imageData, 0, 0);
+    }
+
+    // 将处理完成的照片绘制到最终画布
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+
+    ctx.drawImage(tempCanvas, x, y, w, h);
+
+    ctx.restore();
+}
+function parseCube(text) {
+    const lines = text.split(/\r?\n/);
+    let size = 0;
+    const values = [];
+
+    for (const line of lines) {
+        const s = line.trim();
+
+        if (!s || s.startsWith('#') || s.startsWith('TITLE')) continue;
+
+        if (s.startsWith('LUT_3D_SIZE')) {
+            size = parseInt(s.split(/\s+/)[1]);
+            continue;
+        }
+
+        if (s.startsWith('DOMAIN_')) continue;
+
+        const parts = s.split(/\s+/).map(Number);
+
+        if (parts.length === 3 && parts.every(Number.isFinite)) {
+            values.push(parts);
+        }
+    }
+
+    if (!size || values.length !== size ** 3) {
+        throw new Error('LUT 文件格式不正确');
+    }
+
+    return { size, values };
+}
+function applyCubeLut(imageData, lut) {
+    const pixels = imageData.data;
+    const size = lut.size;
+    const values = lut.values;
+
+    function getColor(r, g, b) {
+        return values[(b * size + g) * size + r];
+    }
+
+    for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i] / 255 * (size - 1);
+        const g = pixels[i + 1] / 255 * (size - 1);
+        const b = pixels[i + 2] / 255 * (size - 1);
+
+        const r0 = Math.floor(r);
+        const g0 = Math.floor(g);
+        const b0 = Math.floor(b);
+
+        const r1 = Math.min(r0 + 1, size - 1);
+        const g1 = Math.min(g0 + 1, size - 1);
+        const b1 = Math.min(b0 + 1, size - 1);
+
+        const fr = r - r0;
+        const fg = g - g0;
+        const fb = b - b0;
+
+        const c000 = getColor(r0, g0, b0);
+        const c100 = getColor(r1, g0, b0);
+        const c010 = getColor(r0, g1, b0);
+        const c110 = getColor(r1, g1, b0);
+        const c001 = getColor(r0, g0, b1);
+        const c101 = getColor(r1, g0, b1);
+        const c011 = getColor(r0, g1, b1);
+        const c111 = getColor(r1, g1, b1);
+
+        for (let channel = 0; channel < 3; channel++) {
+            const c00 = c000[channel] * (1 - fr) + c100[channel] * fr;
+            const c10 = c010[channel] * (1 - fr) + c110[channel] * fr;
+            const c01 = c001[channel] * (1 - fr) + c101[channel] * fr;
+            const c11 = c011[channel] * (1 - fr) + c111[channel] * fr;
+
+            const c0 = c00 * (1 - fg) + c10 * fg;
+            const c1 = c01 * (1 - fg) + c11 * fg;
+
+            const result = c0 * (1 - fb) + c1 * fb;
+
+            pixels[i + channel] = Math.max(
+                0,
+                Math.min(255, Math.round(result * 255))
+            );
+        }
+    }
+
+    return imageData;
+}
+function renderResult() {
+    if (!photos.length) return;
+
+    const cap = $('caption').value.trim() || 'mellow booth';
+    const photo = (i) => photos[i % photos.length];
+
+    // 01 经典四格：竖版四张照片
+    if (layout === 'strip4') {
+        const pad = 34;
+        const gap = 13;
+        const photoW = 500;
+        const photoH = 280;
+        const foot = 95;
+
+        canvas.width = photoW + pad * 2;
+        canvas.height = pad * 2 + photoH * 4 + gap * 3 + foot;
+
+        ctx.fillStyle = frameColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < 4; i++) {
+            drawCrop(
+                photo(i),
+                pad,
+                pad + i * (photoH + gap),
+                photoW,
+                photoH
+            );
+        }
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = frameColor === '#29272b' ? '#fff' : '#8b6b75';
+
+        if (sticker !== 'none') {
+            ctx.font = '26px Georgia';
+            ctx.fillText(sticker, canvas.width / 2, canvas.height - 55);
+        }
+
+        ctx.font = '14px Arial';
+        ctx.fillText(cap, canvas.width / 2, canvas.height - 20);
+    }
+
+    // 02 大四格：两行两列
+    else if (layout === 'big4') {
+        canvas.width = 1200;
+        canvas.height = 1800;
+
+        const pad = 70;
+        const gap = 24;
+        const photoW = (1200 - pad * 2 - gap) / 2;
+        const photoH = 690;
+
+        ctx.fillStyle = frameColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < 4; i++) {
+            const col = i % 2;
+            const row = Math.floor(i / 2);
+
+            const x = pad + col * (photoW + gap);
+            const y = pad + row * (photoH + gap);
+
+            drawCrop(photo(i), x, y, photoW, photoH);
+        }
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#8b6b75';
+        ctx.font = '30px Georgia';
+        ctx.fillText(cap, canvas.width / 2, 1680);
+    }
+
+    // 03 双格方形：两张照片左右排列
+    else if (layout === 'grid2') {
+        canvas.width = 1200;
+        canvas.height = 760;
+
+        ctx.fillStyle = frameColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const size = 520;
+        const gap = 24;
+        const x = (canvas.width - size * 2 - gap) / 2;
+        const y = 70;
+
+        drawCrop(photo(0), x, y, size, size);
+        drawCrop(photo(1), x + size + gap, y, size, size);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#8b6b75';
+        ctx.font = '28px Georgia';
+        ctx.fillText(cap, canvas.width / 2, 680);
+    }
+
+    // 04 证件照六格：左侧六张，右侧品牌留白
+    else if (layout === 'id6') {
+        canvas.width = 1200;
+        canvas.height = 760;
+
+        const left = 30;
+        const top = 30;
+        const largeW = 402;
+        const largeH = 440;
+        const smallW = 196;
+        const smallH = 240;
+        const gap = 14;
+
+        ctx.fillStyle = frameColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 上方两张大照片
+        drawCrop(photo(0), left, top, largeW, largeH);
+
+        drawCrop(
+            photo(1),
+            left + largeW + gap,
+            top,
+            largeW,
+            largeH
+        );
+
+        // 下方四张小照片
+        const smallY = top + largeH + gap;
+
+        for (let i = 0; i < 4; i++) {
+            const x = left + i * (smallW + gap);
+
+            drawCrop(
+                photo(i + 2),
+                x,
+                smallY,
+                smallW,
+                smallH
+            );
+        }
+
+        // 右侧品牌装饰
+        const brandX = 1035;
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#8b5966';
+        
+    }
+   // 绘制选中的透明 PNG 相框
+if (selectedCloudFrame && selectedCloudFrame.img) {
+    console.log('正在绘制相框：', selectedCloudFrame.name);
+
+    ctx.drawImage(
+        selectedCloudFrame.img,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+}
+    canvas.style.display = 'block';
+    $('previewArea').querySelector('.placeholder').style.display = 'none';
+   
+}
+
+$('download').onclick=()=>{if(!photos.length){alert('请先拍摄或上传照片。');return}renderResult();const a=document.createElement('a');a.download='little-moment-photo.png';a.href=canvas.toDataURL('image/png');a.click()};
+function resetAll(){stopCamera();photos=[];renderThumbs();canvas.style.display='none';$('previewArea').querySelector('.placeholder').style.display='block';$('previewArea').querySelector('.placeholder').textContent='你的成品会出现在这里 ♡\\n先拍摄或上传照片，再选择喜欢的设计。'}
+loadCloudFrames();
+loadCloudFilters();
+</script>
+</body></html>

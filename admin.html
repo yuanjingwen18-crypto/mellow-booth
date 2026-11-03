@@ -1,0 +1,580 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mellow Booth. - Admin</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #faf5f2;
+  color: #51464a;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  background: white;
+  padding: 25px 6%;
+  border-bottom: 1px solid #f0dfe3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-family: Georgia, serif;
+  font-size: 26px;
+  color: #bd7188;
+}
+
+main {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+.panel {
+  background: white;
+  border: 1px solid #f0dfe3;
+  border-radius: 20px;
+  padding: 25px;
+  margin-bottom: 22px;
+}
+
+h2 { color: #bd7188; }
+
+.upload {
+  display: block;
+  padding: 30px;
+  border: 2px dashed #e6bdca;
+  border-radius: 15px;
+  text-align: center;
+  cursor: pointer;
+  margin: 15px 0;
+}
+
+input, button {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ead8de;
+}
+
+button {
+  background: #d98da2;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+input[type="file"] { max-width: 100%; }
+
+.status {
+  color: #94717e;
+  font-size: 13px;
+  margin-top: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">Mellow Booth.</div>
+  <span>ADMIN DASHBOARD</span>
+</header>
+
+<main>
+
+  <h1>Welcome, Administrator ♡</h1>
+  <p>Manage your photo studio assets.</p>
+
+  <section class="panel">
+    <h2>01 / Filter Management</h2>
+    <p>上传你制作的 .cube 滤镜</p>
+
+    <input id="filterName"
+      type="text"
+      placeholder="Filter name">
+
+    <label class="upload">
+      选择 .cube 滤镜文件
+      <input id="filterFile"
+        type="file"
+        accept=".cube"
+        hidden>
+    </label>
+
+    <button id="uploadFilter">添加滤镜</button>
+    <p class="status" id="filterStatus"></p>
+  </section>
+
+  <section class="panel">
+    <h2>02 / Frame Management</h2>
+    <p>上传你设计的透明 PNG 相框</p>
+
+    <input id="frameName"
+      type="text"
+      placeholder="Frame name">
+
+    <label class="upload">
+      选择透明 PNG 相框
+      <input id="frameFile"
+        type="file"
+        accept="image/png"
+        hidden>
+    </label>
+
+    <label>
+      适用布局：
+      <select id="frameLayout">
+    <option value="all">全部布局</option>
+    <option value="strip4">经典四格</option>
+    <option value="big4">大四格</option>
+    <option value="grid2">双格方形</option>
+    <option value="id6">证件照六格</option>
+</select>
+    </label>
+
+    <br><br>
+    <button id="uploadFrame">添加相框</button>
+    <p class="status" id="frameStatus"></p>
+  </section>
+
+  <section class="panel">
+    <h2>03 / Published Assets</h2>
+    <p>管理已经上传的相框素材。</p>
+
+    <div id="assetList">
+        正在加载素材...
+    </div>
+    <h3>已上传滤镜 Filter Library</h3>
+
+<div id="filterList">
+    正在加载滤镜...
+</div>
+</section>
+
+  <section class="panel" id="adminLogin">
+  <h2>管理员登录</h2>
+
+  <input
+    type="email"
+    id="adminEmail"
+    placeholder="管理员邮箱"
+  >
+
+  <input
+    type="password"
+    id="adminPassword"
+    placeholder="管理员密码"
+  >
+
+  <button id="loginButton">登录</button>
+
+  <p class="status" id="loginStatus"></p>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script>
+    let isAdmin = false;
+
+document.getElementById('loginButton').addEventListener('click', async () => {
+    const email = document.getElementById('adminEmail').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    const status = document.getElementById('loginStatus');
+
+    if (!email || !password) {
+        status.textContent = '请输入邮箱和密码';
+        return;
+    }
+
+    status.textContent = '正在验证登录...';
+
+    try {
+        // 1. 使用 Supabase 登录
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+        if (error) throw error;
+
+        // 2. 检查当前账号是否是管理员
+        const { data: admin, error: adminError } = await supabaseClient
+            .from('admin_users')
+            .select('user_id')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+
+        if (adminError) throw adminError;
+
+        if (!admin) {
+            await supabaseClient.auth.signOut();
+            throw new Error('这个账号没有管理员权限');
+        }
+
+        // 3. 登录成功
+        isAdmin = true;
+        status.textContent = '管理员登录成功！';
+
+        document.getElementById('adminLogin').style.display = 'none';
+
+    } catch (error) {
+        isAdmin = false;
+        console.error('管理员登录失败：', error);
+        status.textContent = '登录失败：' + error.message;
+    }
+});
+async function testLoadFilters() {
+  const { data, error } = await supabaseClient
+    .from('filters')
+    .select('*')
+    .eq('is_published', true);
+
+  console.log('滤镜数据：', data);
+  console.log('读取错误：', error);
+const { data: boothData, error: boothError } = await supabaseClient
+  .from('booth_assets')
+  .select('*')
+  .eq('is_active', true);
+
+console.log('相框数据：', boothData);
+console.log('相框读取错误：', boothError);
+}
+async function loadAssets() {
+    const list = document.getElementById('assetList');
+
+    list.textContent = '正在加载相框...';
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('booth_assets')
+            .select('id, name, storage_path, layout, is_active')
+            .eq('asset_type', 'frame')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        list.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            list.textContent = '目前还没有上传相框。';
+            return;
+        }
+
+        data.forEach(frame => {
+            const { data: publicData } = supabaseClient
+                .storage
+                .from('frames')
+                .getPublicUrl(frame.storage_path);
+
+            const item = document.createElement('div');
+            item.style.cssText =
+                'display:flex;align-items:center;gap:15px;padding:15px 0;border-bottom:1px solid #f0dfe3;';
+
+            const img = document.createElement('img');
+            img.src = publicData.publicUrl;
+            img.alt = frame.name;
+            img.style.cssText =
+                'width:90px;height:90px;object-fit:contain;background:#faf5f2;border-radius:10px;';
+
+            const info = document.createElement('div');
+
+            const name = document.createElement('strong');
+            name.textContent = frame.name;
+
+            const layout = document.createElement('p');
+            const layoutNames = {
+                all: '全部布局',
+                strip4: '经典四格',
+                big4: '大四格',
+                grid2: '双格方形',
+                id6: '证件照六格'
+            };
+
+            layout.textContent = '适用布局：' + (layoutNames[frame.layout] || frame.layout);
+            layout.style.cssText = 'font-size:13px;color:#94717e;';
+
+            const status = document.createElement('p');
+            status.textContent = frame.is_active ? '已启用' : '已停用';
+            status.style.cssText = 'font-size:12px;color:#94717e;';
+
+            info.appendChild(name);
+info.appendChild(layout);
+info.appendChild(status);
+
+// 创建删除按钮
+const deleteBtn = document.createElement('button');
+deleteBtn.textContent = '删除相框';
+deleteBtn.style.cssText =
+    'padding:8px 14px;border:1px solid #d99aaa;background:white;color:#b65c75;border-radius:8px;cursor:pointer;';
+
+// 点击删除
+deleteBtn.addEventListener('click', async () => {
+    const confirmed = confirm('确定要删除相框「' + frame.name + '」吗？');
+
+    if (!confirmed) return;
+
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = '删除中...';
+
+    try {
+        // 先删除 Storage 中的图片
+        const { error: storageError } = await supabaseClient
+            .storage
+            .from('frames')
+            .remove([frame.storage_path]);
+
+        if (storageError) throw storageError;
+
+        // 再删除数据库记录
+        const { error: databaseError } = await supabaseClient
+            .from('booth_assets')
+            .delete()
+            .eq('id', frame.id);
+
+        if (databaseError) throw databaseError;
+
+        alert('相框已删除！');
+        loadAssets();
+
+    } catch (error) {
+        console.error('删除相框失败：', error);
+        alert('删除失败：' + error.message);
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = '删除相框';
+    }
+});
+
+item.appendChild(img);
+item.appendChild(info);
+item.appendChild(deleteBtn);
+list.appendChild(item);
+        });
+
+    } catch (error) {
+        console.error('加载相框列表失败：', error);
+        list.textContent = '加载失败：' + error.message;
+    }
+}
+async function loadFilterList() {
+    const list = document.getElementById('filterList');
+
+    list.textContent = '正在加载滤镜...';
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('filters')
+            .select('id, name, file_path, is_published')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        list.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            list.textContent = '目前还没有上传滤镜。';
+            return;
+        }
+
+        data.forEach(filter => {
+            const item = document.createElement('div');
+
+            item.style.cssText =
+                'display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid #f0dfe3;';
+
+            const info = document.createElement('div');
+
+            const name = document.createElement('strong');
+            name.textContent = filter.name;
+
+            const status = document.createElement('p');
+            status.textContent = filter.is_published ? '已发布' : '已停用';
+            status.style.cssText = 'font-size:13px;color:#94717e;';
+
+            info.appendChild(name);
+            info.appendChild(status);
+
+            // 启用 / 停用按钮
+            const toggleBtn = document.createElement('button');
+            toggleBtn.textContent = filter.is_published ? '停用' : '启用';
+
+            toggleBtn.addEventListener('click', async () => {
+                toggleBtn.disabled = true;
+
+                try {
+                    const { error } = await supabaseClient
+                        .from('filters')
+                        .update({
+                            is_published: !filter.is_published
+                        })
+                        .eq('id', filter.id);
+
+                    if (error) throw error;
+
+                    loadFilterList();
+
+                } catch (error) {
+                    alert('修改状态失败：' + error.message);
+                    toggleBtn.disabled = false;
+                }
+            });
+
+            // 删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '删除滤镜';
+
+            deleteBtn.addEventListener('click', async () => {
+                const confirmed = confirm(
+                    '确定要删除滤镜「' + filter.name + '」吗？'
+                );
+
+                if (!confirmed) return;
+
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = '删除中...';
+
+                try {
+                    const { error: storageError } = await supabaseClient
+                        .storage
+                        .from('filters')
+                        .remove([filter.file_path]);
+
+                    if (storageError) throw storageError;
+
+                    const { error: databaseError } = await supabaseClient
+                        .from('filters')
+                        .delete()
+                        .eq('id', filter.id);
+
+                    if (databaseError) throw databaseError;
+
+                    alert('滤镜已删除！');
+                    loadFilterList();
+
+                } catch (error) {
+                    console.error('删除滤镜失败：', error);
+                    alert('删除失败：' + error.message);
+                    deleteBtn.disabled = false;
+                    deleteBtn.textContent = '删除滤镜';
+                }
+            });
+
+            item.appendChild(info);
+            item.appendChild(toggleBtn);
+            item.appendChild(deleteBtn);
+
+            list.appendChild(item);
+        });
+
+    } catch (error) {
+        console.error('加载滤镜列表失败：', error);
+        list.textContent = '加载失败：' + error.message;
+    }
+}
+document.getElementById('uploadFilter').addEventListener('click', async () => {
+    const name = document.getElementById('filterName').value.trim();
+    const file = document.getElementById('filterFile').files[0];
+    const status = document.getElementById('filterStatus');
+
+    if (!name || !file) {
+        status.textContent = '请填写滤镜名称并选择 .cube 文件';
+        return;
+    }
+
+    status.textContent = '正在上传...';
+
+    try {
+        const filePath = `${Date.now()}-${file.name}`;
+
+        // 1. 上传文件到 Supabase Storage
+        const { error: uploadError } = await supabaseClient
+            .storage
+            .from('filters')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // 2. 将滤镜信息写入 filters 数据表
+        const { error: insertError } = await supabaseClient
+            .from('filters')
+            .insert([{
+                name: name,
+                file_path: filePath,
+                is_published: true
+            }]);
+
+        if (insertError) throw insertError;
+
+        status.textContent = '滤镜上传成功！';
+
+        document.getElementById('filterName').value = '';
+        document.getElementById('filterFile').value = '';
+
+        testLoadFilters();
+
+    } catch (error) {
+        console.error('滤镜上传失败：', error);
+        status.textContent = '上传失败：' + error.message;
+    }
+});
+document.getElementById('uploadFrame').addEventListener('click', async () => {
+    const name = document.getElementById('frameName').value.trim();
+    const file = document.getElementById('frameFile').files[0];
+    const layout = document.getElementById('frameLayout').value;
+    const status = document.getElementById('frameStatus');
+
+    if (!name || !file) {
+        status.textContent = '请填写相框名称并选择 PNG 文件';
+        return;
+    }
+
+    if (file.type !== 'image/png') {
+        status.textContent = '请上传 PNG 格式的相框文件';
+        return;
+    }
+
+    status.textContent = '正在上传相框...';
+
+    try {
+        const filePath = `${Date.now()}-.png`;
+
+        const { error: uploadError } = await supabaseClient
+            .storage
+            .from('frames')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { error: insertError } = await supabaseClient
+            .from('booth_assets')
+            .insert([{
+                asset_type: 'frame',
+                name: name,
+                storage_path: filePath,
+                layout: layout,
+                is_active: true
+            }]);
+
+        if (insertError) throw insertError;
+
+        status.textContent = '相框上传成功！';
+
+        document.getElementById('frameName').value = '';
+        document.getElementById('frameFile').value = '';
+
+    } catch (error) {
+        console.error('相框上传失败：', error);
+        status.textContent = '上传失败：' + error.message;
+    }
+});
+testLoadFilters();
+loadAssets();
+loadFilterList();
+</script>
+</body>
+</html>
