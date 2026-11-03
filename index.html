@@ -323,9 +323,159 @@ document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{document.que
 document.querySelectorAll('[data-sticker]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-sticker]').forEach(x=>x.classList.remove('active'));b.classList.add('active');sticker=b.dataset.sticker;renderResult()});
 ['smooth','brightness','contrast'].forEach(id=>$(id).oninput=()=>{$(id+'Val').value=$(id).value;renderResult()});
 $('caption').oninput=renderResult;$('makePreview').onclick=renderResult;$('refresh').onclick=renderResult;
+function applyBasicFilterPixels(imageData, filterName, brightness, contrast, smooth) {
+    const data = imageData.data;
+
+    const clamp = v => Math.max(0, Math.min(255, v));
+
+    function changeSaturation(r, g, b, amount) {
+        const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        return [
+            gray + (r - gray) * amount,
+            gray + (g - gray) * amount,
+            gray + (b - gray) * amount
+        ];
+    }
+
+    for (let i = 0; i < data.length; i += 4) {
+        let r = data[i];
+        let g = data[i + 1];
+        let b = data[i + 2];
+
+        // 基础滤镜
+        if (filterName === 'soft') {
+            [r, g, b] = changeSaturation(r, g, b, 1.05);
+            r *= 1.08;
+            g *= 1.08;
+            b *= 1.08;
+            r = 128 + (r - 128) * 0.94;
+            g = 128 + (g - 128) * 0.94;
+            b = 128 + (b - 128) * 0.94;
+        }
+
+        else if (filterName === 'film') {
+            [r, g, b] = changeSaturation(r, g, b, 0.82);
+
+            const sr = 0.393*r + 0.769*g + 0.189*b;
+            const sg = 0.349*r + 0.686*g + 0.168*b;
+            const sb = 0.272*r + 0.534*g + 0.131*b;
+
+            r = r * 0.82 + sr * 0.18;
+            g = g * 0.82 + sg * 0.18;
+            b = b * 0.82 + sb * 0.18;
+
+            r = 128 + (r - 128) * 0.92;
+            g = 128 + (g - 128) * 0.92;
+            b = 128 + (b - 128) * 0.92;
+        }
+
+        else if (filterName === 'warm') {
+            [r, g, b] = changeSaturation(r, g, b, 1.18);
+
+            const sr = 0.393*r + 0.769*g + 0.189*b;
+            const sg = 0.349*r + 0.686*g + 0.168*b;
+            const sb = 0.272*r + 0.534*g + 0.131*b;
+
+            r = r * 0.87 + sr * 0.13;
+            g = g * 0.87 + sg * 0.13;
+            b = b * 0.87 + sb * 0.13;
+
+            r *= 1.04;
+            g *= 1.04;
+            b *= 1.04;
+        }
+
+        else if (filterName === 'mono') {
+            const gray = 0.2126*r + 0.7152*g + 0.0722*b;
+
+            r = gray;
+            g = gray;
+            b = gray;
+
+            r = 128 + (r - 128) * 1.05;
+            g = 128 + (g - 128) * 1.05;
+            b = 128 + (b - 128) * 1.05;
+        }
+
+        else if (filterName === 'cool') {
+            [r, g, b] = changeSaturation(r, g, b, 0.82);
+
+            const angle = 8 * Math.PI / 180;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+
+            const nr =
+                (0.213 + cos*0.787 - sin*0.213)*r +
+                (0.715 - cos*0.715 - sin*0.715)*g +
+                (0.072 - cos*0.072 + sin*0.928)*b;
+
+            const ng =
+                (0.213 - cos*0.213 + sin*0.143)*r +
+                (0.715 + cos*0.285 + sin*0.140)*g +
+                (0.072 - cos*0.072 - sin*0.283)*b;
+
+            const nb =
+                (0.213 - cos*0.213 - sin*0.787)*r +
+                (0.715 - cos*0.715 + sin*0.715)*g +
+                (0.072 + cos*0.928 + sin*0.072)*b;
+
+            r = nr * 1.04;
+            g = ng * 1.04;
+            b = nb * 1.04;
+        }
+
+        // 用户亮度和对比度
+        r *= brightness;
+        g *= brightness;
+        b *= brightness;
+
+        r = 128 + (r - 128) * contrast;
+        g = 128 + (g - 128) * contrast;
+        b = 128 + (b - 128) * contrast;
+
+        data[i] = clamp(r);
+        data[i + 1] = clamp(g);
+        data[i + 2] = clamp(b);
+    }
+
+    // 柔肤：轻微混合周围像素
+    if (smooth > 0) {
+        const original = new Uint8ClampedArray(data);
+        const amount = Math.min(smooth / 500, 0.3);
+        const width = imageData.width;
+        const height = imageData.height;
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                const i = (y * width + x) * 4;
+
+                for (let c = 0; c < 3; c++) {
+                    let total = 0;
+
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const p = ((y + dy) * width + x + dx) * 4 + c;
+                            total += original[p];
+                        }
+                    }
+
+                    const blurred = total / 9;
+
+                    data[i + c] =
+                        original[i + c] * (1 - amount) +
+                        blurred * amount;
+                }
+            }
+        }
+    }
+
+    return imageData;
+}
 function drawCrop(img, x, y, w, h) {
     const iw = img.width;
     const ih = img.height;
+
     const scale = Math.max(w / iw, h / ih);
     const sw = w / scale;
     const sh = h / scale;
@@ -337,55 +487,41 @@ function drawCrop(img, x, y, w, h) {
     tempCanvas.width = Math.round(w);
     tempCanvas.height = Math.round(h);
 
-    const tempCtx = tempCanvas.getContext('2d');
+    const tempCtx = tempCanvas.getContext('2d', {
+        willReadFrequently: true
+    });
 
-    // 先绘制基础照片和内置滤镜
-    const baseFilter = filterMap[filter] === 'none'
-        ? ''
-        : filterMap[filter];
-
-    tempCtx.filter =
-        baseFilter +
-        ' brightness(' + (Number($('brightness').value) / 100) + ')' +
-        ' contrast(' + (Number($('contrast').value) / 100) + ')';
-
+    // 先绘制照片
     tempCtx.drawImage(
         img, sx, sy, sw, sh,
         0, 0, tempCanvas.width, tempCanvas.height
     );
 
-    tempCtx.filter = 'none';
+    // 获取像素数据
+    const imageData = tempCtx.getImageData(
+        0, 0,
+        tempCanvas.width,
+        tempCanvas.height
+    );
 
-    // 添加磨皮效果
-    const sm = Number($('smooth').value);
-
-    if (sm > 0) {
-        tempCtx.save();
-        tempCtx.globalAlpha = sm / 500;
-        tempCtx.filter = 'blur(5px)';
-
-        tempCtx.drawImage(
-            img, sx, sy, sw, sh,
-            0, 0, tempCanvas.width, tempCanvas.height
-        );
-
-        tempCtx.restore();
-    }
+    // 应用基础滤镜、亮度、对比度和柔肤
+    applyBasicFilterPixels(
+        imageData,
+        filter,
+        Number($('brightness').value) / 100,
+        Number($('contrast').value) / 100,
+        Number($('smooth').value)
+    );
 
     // 应用云端 LUT 滤镜
     if (cloudLut) {
-        const imageData = tempCtx.getImageData(
-            0, 0,
-            tempCanvas.width,
-            tempCanvas.height
-        );
-
         applyCubeLut(imageData, cloudLut);
-
-        tempCtx.putImageData(imageData, 0, 0);
     }
 
-    // 将处理完成的照片绘制到最终画布
+    // 写回临时画布
+    tempCtx.putImageData(imageData, 0, 0);
+
+    // 绘制到最终画布
     ctx.save();
     ctx.beginPath();
     ctx.rect(x, y, w, h);
