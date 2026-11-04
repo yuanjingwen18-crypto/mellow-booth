@@ -29,9 +29,153 @@ video{width:100%;height:100%;object-fit:cover;display:none;transform:scaleX(-1)}
 .frame-note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}
 footer{text-align:center;color:#aa9da0;font-size:11px;padding:24px}
 @media(max-width:800px){.workspace{grid-template-columns:1fr}nav{display:none}main{padding-top:20px}.hero{padding-top:20px}.panel{padding:16px}}
+/* Welcome Page */
+#welcomePage {
+    visibility: hidden;
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 15% 20%, #f5d5dc 0 8%, transparent 8.5%),
+        radial-gradient(circle at 85% 75%, #e8d9c9 0 10%, transparent 10.5%),
+        #f8ede8;
+}
+
+.welcome-content {
+    width: min(900px, 92%);
+    padding: clamp(45px, 7vw, 90px) 35px;
+    text-align: center;
+
+    background: rgba(255, 250, 248, 0.12);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-radius: 45px;
+
+    box-shadow: 0 12px 45px rgba(90, 55, 55, 0.12);
+}
+
+.welcome-brand {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    letter-spacing: 5px;
+    color: #b85c70;
+    font-weight: bold;
+}
+
+.welcome-decoration {
+    margin: 28px 0 12px;
+    color: #c27c91;
+    font-size: 28px;
+    letter-spacing: 12px;
+}
+
+#welcomeTitle {
+    font-family: Georgia, serif;
+    font-size: clamp(38px, 7vw, 64px);
+    line-height: 1.12;
+    font-weight: 500;
+    color: #493d3b;
+    margin: 15px 0;
+}
+
+#welcomeDescription {
+    max-width: 390px;
+    margin: 18px auto 30px;
+    color: #927c7c;
+    font-size: 14px;
+    line-height: 1.9;
+}
+
+#welcomeStartButton {
+    display: inline-block;
+    padding: 20px 65px;
+    border: none;
+    border-radius: 999px;
+
+    background: linear-gradient(135deg, #d9919b, #c97884);
+    color: #ffffff;
+
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 2px;
+
+    cursor: pointer;
+    box-shadow: 0 5px 0 rgba(150, 80, 90, 0.25);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+#welcomeStartButton:hover {
+    background: linear-gradient(135deg, #df9da6, #cf8290);
+    box-shadow: 0 7px 18px rgba(150, 80, 90, 0.2);
+}
+
+.welcome-footer {
+    margin-top: 38px;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #b49b9b;
+}
+
+@media (max-width: 600px) {
+    #welcomePage {
+    min-height: 100vh;
+    min-height: 100svh;
+    width: 100%;
+    padding: 24px 16px;
+    box-sizing: border-box;
+}
+
+    .welcome-content {
+    width: 100%;
+    min-width: 0;
+    padding: 45px 20px;
+    box-sizing: border-box;
+}
+}
+/* 初始显示欢迎页，隐藏拍照亭 */
+.welcome-mode header,
+.welcome-mode main,
+.welcome-mode footer {
+    display: none;
+}
+/* 照片大小调整滑块：奶茶浅咖色 */
+#slotZoom {
+    width: 100%;
+    accent-color: #937f6e;
+    cursor: pointer;
+}
 </style>
 </head>
-<body>
+<body class="welcome-mode">
+    <!-- Welcome Page -->
+<section id="welcomePage">
+    <div class="welcome-content">
+        <div class="welcome-brand">MELLOW BOOTH</div>
+
+        <div class="welcome-decoration"> ♡ </div>
+
+        <h1 id="welcomeTitle">
+            Your little moment<br>starts here.
+        </h1>
+
+       
+
+        <button id="welcomeStartButton" type="button">
+            START CREATING ♡
+        </button>
+
+        <div class="welcome-footer">
+            By WildRoseDiary · EST. 2026
+        </div>
+    </div>
+</section>
 <header><div class="logo">Mellow Booth.<small>YOUR LITTLE PHOTO STUDIO</small></div><nav><span onclick="scrollTo({top:0,behavior:'smooth'})">STUDIO</span><span onclick="document.getElementById('editor').scrollIntoView({behavior:'smooth'})">EDIT</span><span onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">ABOUT</span></nav><button class="tiny soft" onclick="resetAll()">重新开始 ↻</button></header>
 <main>
 <section class="hero">
@@ -1226,6 +1370,54 @@ async function loadSiteSettings() {
         if (data.hero_button_text) {
             $('heroButton').textContent = data.hero_button_text;
         }
+        // 更新 Welcome Page 文字
+if (data.welcome_title) {
+    $('welcomeTitle').textContent = data.welcome_title;
+}
+
+
+if (data.welcome_button_text) {
+    $('welcomeStartButton').textContent = data.welcome_button_text;
+}
+// 等对应设备的 Welcome 背景图片加载完成后再显示页面
+const welcomePage = $('welcomePage');
+
+const isMobile = window.matchMedia('(max-width: 600px)').matches;
+
+// 根据设备选择背景图片
+const selectedBackgroundPath = isMobile
+    ? (data.welcome_mobile_background_path || data.welcome_background_path)
+    : data.welcome_background_path;
+console.log('Welcome 背景选择结果：', {
+    isMobile,
+    selectedBackgroundPath
+});
+if (selectedBackgroundPath) {
+    const { data: welcomeBackgroundData } = supabaseClient
+        .storage
+        .from('site-assets')
+        .getPublicUrl(selectedBackgroundPath);
+
+    const backgroundUrl = welcomeBackgroundData.publicUrl;
+    const backgroundImage = new Image();
+
+    backgroundImage.onload = function () {
+        welcomePage.style.backgroundImage = `url("${backgroundUrl}")`;
+        welcomePage.style.backgroundSize = 'cover';
+        welcomePage.style.backgroundPosition = 'center';
+        welcomePage.style.backgroundRepeat = 'no-repeat';
+        welcomePage.style.visibility = 'visible';
+    };
+
+    backgroundImage.onerror = function () {
+        welcomePage.style.visibility = 'visible';
+        console.error('Welcome 背景图片加载失败');
+    };
+
+    backgroundImage.src = backgroundUrl;
+} else {
+    welcomePage.style.visibility = 'visible';
+}
 // 更新网站背景图片
 if (data.background_path) {
     const { data: backgroundData } = supabaseClient
@@ -1236,10 +1428,17 @@ if (data.background_path) {
     document.body.style.backgroundImage =
         `url("${backgroundData.publicUrl}")`;
 
-    document.body.style.backgroundSize = 'cover';
-    document.body.style.backgroundPosition = 'center';
-    document.body.style.backgroundAttachment = 'fixed';
-    document.body.style.backgroundRepeat = 'no-repeat';
+    document.body.style.backgroundSize = '100% auto';
+document.body.style.backgroundPosition = 'top center';
+document.body.style.backgroundAttachment = 'scroll';
+document.body.style.backgroundRepeat = 'repeat-y';
+
+    // 手机端背景适配：保持图片比例，避免过度放大
+if (window.matchMedia('(max-width: 600px)').matches) {
+    document.body.style.backgroundSize = '100% auto';
+    document.body.style.backgroundAttachment = 'scroll';
+    document.body.style.backgroundPosition = 'top center';
+}
 }
 // 读取并设置网站背景音乐
 const musicControl = $('siteMusicControl');
@@ -1295,6 +1494,20 @@ document.getElementById('siteMusicButton').addEventListener('click', async () =>
         audio.pause();
         button.textContent = '♫ 播放背景音乐';
     }
+});
+// Welcome Page: enter the photo studio
+// Welcome Page: enter the photo studio
+document.getElementById('welcomeStartButton').addEventListener('click', function () {
+    document.body.classList.remove('welcome-mode');
+
+    // Hide the welcome page
+    document.getElementById('welcomePage').style.display = 'none';
+
+    // Show the photo studio
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
 });
 </script>
 </body></html>
