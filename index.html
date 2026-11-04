@@ -205,7 +205,22 @@ footer{text-align:center;color:#aa9da0;font-size:11px;padding:24px}
   <button class="chip" data-count="4">四张连拍</button>
   <button class="chip" data-count="6">六张连拍</button>
 </div>
-<div class="section"><div class="section-title">我的照片 <span id="photoCount" style="color:#aa9da0;font-weight:400">0 张</span></div><div id="thumbs" class="options"><span style="font-size:12px;color:#b4a8aa">拍摄或上传后，照片会显示在这里。</span></div><div class="controls"><button class="secondary tiny" id="clearPhotos">清空照片</button><button class="soft tiny" id="makePreview">更新成品预览</button></div></div>
+<div class="section">
+    <div class="section-title">
+        我的照片
+        <span id="photoCount" style="color:#aa9da0;font-weight:400">0 张</span>
+    </div>
+
+    <div id="thumbs" class="options">
+        <span style="font-size:12px;color:#b4a8aa">
+            拍摄或上传后，照片会显示在这里。
+        </span>
+    </div>
+
+    <div class="controls">
+        <button class="secondary tiny" id="clearPhotos">清空照片</button>
+    </div>
+</div>
 </section>
 <section class="panel" id="editor">
 <h2>02 / Photo Design <span style="font-size:11px;color:#b5a8aa;font-weight:400">编辑你的照片</span></h2>
@@ -622,7 +637,7 @@ document.querySelectorAll('[data-filter]').forEach(b => {
 document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-color]').forEach(x=>x.classList.remove('active'));b.classList.add('active');frameColor=b.dataset.color;renderResult()});
 document.querySelectorAll('[data-sticker]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-sticker]').forEach(x=>x.classList.remove('active'));b.classList.add('active');sticker=b.dataset.sticker;renderResult()});
 ['smooth','brightness','contrast'].forEach(id=>$(id).oninput=()=>{$(id+'Val').value=$(id).value;renderResult()});
-$('caption').oninput=renderResult;$('makePreview').onclick=renderResult;$('refresh').onclick=renderResult;
+$('caption').oninput=renderResult;$('refresh').onclick=renderResult;
 function applyBasicFilterPixels(imageData, filterName, brightness, contrast, smooth) {
     const data = imageData.data;
 
