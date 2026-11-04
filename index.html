@@ -66,6 +66,41 @@ footer{text-align:center;color:#aa9da0;font-size:11px;padding:24px}
 <section class="panel" id="editor">
 <h2>02 / Photo Design <span style="font-size:11px;color:#b5a8aa;font-weight:400">编辑你的照片</span></h2>
 <div class="preview-area" id="previewArea"><div class="placeholder">你的成品会出现在这里 ♡<br>先拍摄或上传照片，再选择喜欢的设计。</div><canvas id="resultCanvas" width="600" height="1200" style="display:none"></canvas></div>
+<!-- 照片格子编辑区 -->
+<div class="section" id="slotEditor">
+    <div class="section-title">单格照片编辑</div>
+
+    <p class="frame-note">
+        点击成品中的照片格子，选择要调整的位置。
+        之后可以单独移动、缩放或更换该格照片。
+    </p>
+
+    <div id="slotSelector" class="options">
+        <span style="font-size:12px;color:#aa9da0;">
+            请先拍摄或上传照片，并生成成品预览。
+        </span>
+    </div>
+
+    <div class="status" id="slotStatus">
+        当前未选择照片格子。
+    </div>
+    <div style="margin-top:15px;">
+    <label for="slotZoom">调整当前照片大小</label>
+    <input
+        type="range"
+        id="slotZoom"
+        min="1"
+        max="2.5"
+        step="0.05"
+        value="1"
+        style="width:100%;"
+    >
+
+    <button type="button" class="chip" id="resetSlot">
+        重置照片位置
+    </button>
+</div>
+</div>
 <div class="section">
   <div class="section-title">相框布局</div>
   <div class="options">
@@ -177,6 +212,7 @@ async function loadCloudFilters() {
 };
 
             container.appendChild(button);
+            
         });
 
     } catch (error) {
@@ -189,6 +225,10 @@ let cloudFrames = [];
 let selectedCloudFilter = null;
 let selectedCloudFrame = null;
 let cloudLut = null;
+// 每个相框格子的照片分配和位置调整数据
+let slotPhotoOrder = [];
+let slotAdjustments = {};
+let selectedSlotIndex = 0;
 
 async function loadCloudFrames() {
     const container = $('cloudFrames');
@@ -289,10 +329,112 @@ function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=
 function countdown(n){return new Promise(resolve=>{let c=3;$('countdown').style.display='block';$('countdown').textContent=c;let timer=setInterval(()=>{c--;if(c>0)$('countdown').textContent=c;else{clearInterval(timer);$('countdown').style.display='none';resolve()}},700)})}
 function capture(){const c=document.createElement('canvas');c.width=video.videoWidth||640;c.height=video.videoHeight||480;c.getContext('2d').translate(c.width,0);c.getContext('2d').scale(-1,1);c.getContext('2d').drawImage(video,0,0,c.width,c.height);addPhoto(c.toDataURL('image/jpeg',.94))}
 async function takePhotos(){if(!stream)return; $('snap').disabled=true;for(let i=0;i<targetCount;i++){await countdown(3);capture();if(i<targetCount-1)await new Promise(r=>setTimeout(r,450))}$('snap').disabled=false;renderThumbs();renderResult()}
-function addPhoto(src){const img=new Image();img.onload=()=>{photos.push(img);renderThumbs();renderResult()};img.src=src}
+function addPhoto(src) {
+    const img = new Image();
+
+    img.onload = () => {
+        photos.push(img);
+
+        // 新照片加入后，重新分配各个格子的默认照片
+        slotPhotoOrder = [];
+
+        renderThumbs();
+        renderResult();
+    };
+
+    img.src = src;
+}
 $('startCam').onclick=startCamera;$('stopCam').onclick=stopCamera;$('snap').onclick=takePhotos;
 $('upload').onchange=e=>{[...e.target.files].forEach(file=>{if(!file.type.startsWith('image/'))return;const reader=new FileReader();reader.onload=()=>addPhoto(reader.result);reader.readAsDataURL(file)});e.target.value=''};
 function renderThumbs(){$('photoCount').textContent=photos.length+' 张';$('thumbs').innerHTML='';photos.forEach((p,i)=>{const im=document.createElement('img');im.src=p.src;im.style.cssText='width:58px;height:58px;object-fit:cover;border-radius:10px;border:2px solid #f0e0e4';im.title='第'+(i+1)+'张';$('thumbs').appendChild(im)})}
+// 根据当前相框布局，计算照片格子数量
+function getSlotCount() {
+    const counts = {
+        strip4: 4,
+        big4: 4,
+        grid2: 2,
+        id6: 6
+    };
+
+    return counts[layout] || 4;
+}
+
+// 生成照片格子选择按钮
+function renderSlotSelector() {
+    const container = $('slotSelector');
+    const count = getSlotCount();
+
+    if (!photos.length) {
+        container.textContent = '请先拍摄或上传照片。';
+        return;
+    }
+
+    // 为每个格子设置默认照片
+    for (let i = 0; i < count; i++) {
+        if (
+            slotPhotoOrder[i] === undefined ||
+            slotPhotoOrder[i] >= photos.length
+        ) {
+            slotPhotoOrder[i] = i % photos.length;
+        }
+    }
+
+    slotPhotoOrder.length = count;
+    container.innerHTML = '';
+
+    for (let i = 0; i < count; i++) {
+        const button = document.createElement('button');
+
+        button.type = 'button';
+        button.className = 'chip';
+        button.textContent =
+            '格子 ' + (i + 1) +
+            ' · 照片 ' + (slotPhotoOrder[i] + 1);
+
+        if (i === selectedSlotIndex) {
+            button.classList.add('active');
+        }
+
+        button.onclick = () => {
+            selectedSlotIndex = i;
+            $('slotZoom').value =
+                (slotAdjustments[i] && slotAdjustments[i].zoom) || 1;
+            renderSlotSelector();
+
+            $('slotStatus').textContent =
+                '当前选中格子 ' + (i + 1) +
+                '，使用照片 ' + (slotPhotoOrder[i] + 1);
+        };
+
+        container.appendChild(button);
+                const photoSelect = document.createElement('select');
+
+photoSelect.className = 'chip';
+
+for (let j = 0; j < photos.length; j++) {
+    const option = document.createElement('option');
+
+    option.value = j;
+    option.textContent = '使用照片 ' + (j + 1);
+
+    if (j === slotPhotoOrder[i]) {
+        option.selected = true;
+    }
+
+    photoSelect.appendChild(option);
+}
+
+photoSelect.onchange = () => {
+    slotPhotoOrder[i] = Number(photoSelect.value);
+    renderResult();
+};
+
+container.appendChild(photoSelect);
+    }
+
+    $('slotStatus').textContent =
+        '当前选中格子 ' + (selectedSlotIndex + 1);
+}
 $('clearPhotos').onclick=()=>{photos=[];renderThumbs();canvas.style.display='none';$('previewArea').querySelector('.placeholder').style.display='block';$('previewArea').querySelector('.placeholder').textContent='你的成品会出现在这里 ♡\\n先拍摄或上传照片，再选择喜欢的设计。'};
 document.querySelectorAll('[data-count]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-count]').forEach(x=>x.classList.remove('active'));b.classList.add('active');targetCount=+b.dataset.count});
 document.querySelectorAll('[data-layout]').forEach(b => {
@@ -486,15 +628,27 @@ function applyBasicFilterPixels(imageData, filterName, brightness, contrast, smo
 
     return imageData;
 }
-function drawCrop(img, x, y, w, h) {
+function drawCrop(img, x, y, w, h, slotIndex = 0) {
     const iw = img.width;
     const ih = img.height;
 
-    const scale = Math.max(w / iw, h / ih);
-    const sw = w / scale;
-    const sh = h / scale;
-    const sx = (iw - sw) / 2;
-    const sy = (ih - sh) / 2;
+    const adjustment = slotAdjustments[slotIndex] || {
+    zoom: 1
+};
+
+const baseScale = Math.max(w / iw, h / ih);
+const scale = baseScale * adjustment.zoom;
+
+const sw = w / scale;
+const sh = h / scale;
+const maxOffsetX = (iw - sw) / 2;
+const maxOffsetY = (ih - sh) / 2;
+
+const offsetX = adjustment.offsetX || 0;
+const offsetY = adjustment.offsetY || 0;
+
+const sx = maxOffsetX + maxOffsetX * offsetX;
+const sy = maxOffsetY + maxOffsetY * offsetY;
 
     // 创建临时画布
     const tempCanvas = document.createElement('canvas');
@@ -630,12 +784,242 @@ function applyCubeLut(imageData, lut) {
 
     return imageData;
 }
-function renderResult() {
+// 根据鼠标或手指点击的位置，识别照片格子
+function getSlotAtPoint(x, y) {
+    if (layout === 'strip4') {
+        const pad = 34;
+        const photoH = 280;
+        const gap = 13;
+
+        for (let i = 0; i < 4; i++) {
+            const top = pad + i * (photoH + gap);
+
+            if (
+                x >= pad && x <= 534 &&
+                y >= top && y <= top + photoH
+            ) {
+                return i;
+            }
+        }
+    }
+
+    if (layout === 'big4') {
+        const pad = 70;
+        const gap = 24;
+        const photoW = 518;
+        const photoH = 690;
+
+        for (let i = 0; i < 4; i++) {
+            const col = i % 2;
+            const row = Math.floor(i / 2);
+
+            const left = pad + col * (photoW + gap);
+            const top = pad + row * (photoH + gap);
+
+            if (
+                x >= left && x <= left + photoW &&
+                y >= top && y <= top + photoH
+            ) {
+                return i;
+            }
+        }
+    }
+
+    if (layout === 'grid2') {
+        const size = 520;
+        const gap = 24;
+        const left = (1200 - size * 2 - gap) / 2;
+        const top = 70;
+
+        if (y >= top && y <= top + size) {
+            if (x >= left && x <= left + size) return 0;
+            if (x >= left + size + gap &&
+                x <= left + size * 2 + gap) return 1;
+        }
+    }
+
+    if (layout === 'id6') {
+        const left = 30;
+        const top = 30;
+        const largeW = 402;
+        const largeH = 440;
+        const smallW = 196;
+        const smallH = 240;
+        const gap = 14;
+
+        if (y >= top && y <= top + largeH) {
+            if (x >= left && x <= left + largeW) return 0;
+            if (
+                x >= left + largeW + gap &&
+                x <= left + largeW * 2 + gap
+            ) return 1;
+        }
+
+        const smallY = top + largeH + gap;
+
+        if (y >= smallY && y <= smallY + smallH) {
+            for (let i = 0; i < 4; i++) {
+                const slotX = left + i * (smallW + gap);
+
+                if (x >= slotX && x <= slotX + smallW) {
+                    return i + 2;
+                }
+            }
+        }
+    }
+
+    return -1;
+}
+// 鼠标和手机触屏拖动照片
+let isDraggingSlot = false;
+let lastPointerX = 0;
+let lastPointerY = 0;
+let activePointers = new Map();
+let lastPinchDistance = 0;
+
+canvas.style.touchAction = 'none';
+
+canvas.addEventListener('pointerdown', (e) => {
     if (!photos.length) return;
 
-    const cap = $('caption').value.trim() || 'mellow booth';
-    const photo = (i) => photos[i % photos.length];
+    const rect = canvas.getBoundingClientRect();
 
+    const x = (e.clientX - rect.left) * canvas.width / rect.width;
+    const y = (e.clientY - rect.top) * canvas.height / rect.height;
+
+    const slot = getSlotAtPoint(x, y);
+
+    if (slot < 0) return;
+
+    selectedSlotIndex = slot;
+
+    $('slotZoom').value =
+        (slotAdjustments[slot] && slotAdjustments[slot].zoom) || 1;
+
+    renderSlotSelector();
+
+    isDraggingSlot = true;
+    lastPointerX = e.clientX;
+    lastPointerY = e.clientY;
+
+    canvas.setPointerCapture(e.pointerId);
+});
+
+// 记录手指位置，识别双指缩放
+canvas.addEventListener('pointerdown', (e) => {
+    activePointers.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY
+    });
+
+    if (activePointers.size === 2) {
+        const points = Array.from(activePointers.values());
+
+        lastPinchDistance = Math.hypot(
+            points[0].x - points[1].x,
+            points[0].y - points[1].y
+        );
+
+        isDraggingSlot = false;
+    }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+    if (!activePointers.has(e.pointerId)) return;
+
+    activePointers.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY
+    });
+
+    if (activePointers.size !== 2) return;
+
+    const points = Array.from(activePointers.values());
+
+    const distance = Math.hypot(
+        points[0].x - points[1].x,
+        points[0].y - points[1].y
+    );
+
+    if (lastPinchDistance > 0) {
+        const current = slotAdjustments[selectedSlotIndex] || {
+            zoom: 1,
+            offsetX: 0,
+            offsetY: 0
+        };
+
+        const newZoom = current.zoom * distance / lastPinchDistance;
+
+        slotAdjustments[selectedSlotIndex] = {
+            ...current,
+            zoom: Math.max(1, Math.min(2.5, newZoom))
+        };
+
+        $('slotZoom').value =
+            slotAdjustments[selectedSlotIndex].zoom;
+
+        renderResult();
+    }
+
+    lastPinchDistance = distance;
+});
+
+function clearPinchPointer(e) {
+    activePointers.delete(e.pointerId);
+    lastPinchDistance = 0;
+}
+
+canvas.addEventListener('pointerup', clearPinchPointer);
+canvas.addEventListener('pointercancel', clearPinchPointer);
+canvas.addEventListener('pointermove', (e) => {
+    if (!isDraggingSlot) return;
+
+    const rect = canvas.getBoundingClientRect();
+
+    const dx = (e.clientX - lastPointerX) * canvas.width / rect.width;
+    const dy = (e.clientY - lastPointerY) * canvas.height / rect.height;
+
+    const current = slotAdjustments[selectedSlotIndex] || {
+        zoom: 1,
+        offsetX: 0,
+        offsetY: 0
+    };
+
+    slotAdjustments[selectedSlotIndex] = {
+        ...current,
+        offsetX: Math.max(-1, Math.min(1,
+            (current.offsetX || 0) - 2 * dx / canvas.width
+        )),
+        offsetY: Math.max(-1, Math.min(1,
+            (current.offsetY || 0) - 2 * dy / canvas.height
+        ))
+    };
+
+    lastPointerX = e.clientX;
+    lastPointerY = e.clientY;
+
+    renderResult();
+});
+
+canvas.addEventListener('pointerup', () => {
+    isDraggingSlot = false;
+});
+
+canvas.addEventListener('pointercancel', () => {
+    isDraggingSlot = false;
+});
+function renderResult() {
+    if (!photos.length) return;
+        // 更新照片格子选择按钮
+    selectedSlotIndex = Math.min(
+        selectedSlotIndex,
+        getSlotCount() - 1
+    );
+
+    renderSlotSelector();
+
+    const cap = $('caption').value.trim() || 'mellow booth';
+    const photo = (i) => photos[slotPhotoOrder[i] ?? (i % photos.length)];
     // 01 经典四格：竖版四张照片
     if (layout === 'strip4') {
         const pad = 34;
@@ -656,7 +1040,8 @@ function renderResult() {
                 pad,
                 pad + i * (photoH + gap),
                 photoW,
-                photoH
+                photoH,
+                i
             );
         }
 
@@ -692,7 +1077,7 @@ function renderResult() {
             const x = pad + col * (photoW + gap);
             const y = pad + row * (photoH + gap);
 
-            drawCrop(photo(i), x, y, photoW, photoH);
+            drawCrop(photo(i), x, y, photoW, photoH, i);
         }
 
         ctx.textAlign = 'center';
@@ -714,8 +1099,8 @@ function renderResult() {
         const x = (canvas.width - size * 2 - gap) / 2;
         const y = 70;
 
-        drawCrop(photo(0), x, y, size, size);
-        drawCrop(photo(1), x + size + gap, y, size, size);
+        drawCrop(photo(0), x, y, size, size, 0);
+        drawCrop(photo(1), x + size + gap, y, size, size, 1);
 
         ctx.textAlign = 'center';
         ctx.fillStyle = '#8b6b75';
@@ -740,16 +1125,16 @@ function renderResult() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // 上方两张大照片
-        drawCrop(photo(0), left, top, largeW, largeH);
+        drawCrop(photo(0), left, top, largeW, largeH, 0);
 
         drawCrop(
             photo(1),
             left + largeW + gap,
             top,
             largeW,
-            largeH
-        );
-
+            largeH,
+            1
+     );
         // 下方四张小照片
         const smallY = top + largeH + gap;
 
@@ -761,7 +1146,8 @@ function renderResult() {
                 x,
                 smallY,
                 smallW,
-                smallH
+                smallH,
+                i + 2
             );
         }
 
@@ -788,7 +1174,27 @@ if (selectedCloudFrame && selectedCloudFrame.img) {
     $('previewArea').querySelector('.placeholder').style.display = 'none';
    
 }
+// 调整当前照片格子的缩放比例
+$('slotZoom').addEventListener('input', () => {
+    slotAdjustments[selectedSlotIndex] = {
+        ...slotAdjustments[selectedSlotIndex],
+        zoom: Number($('slotZoom').value)
+    };
+$('resetSlot').addEventListener('click', () => {
+    slotAdjustments[selectedSlotIndex] = {
+        zoom: 1,
+        offsetX: 0,
+        offsetY: 0
+    };
 
+    $('slotZoom').value = 1;
+    renderResult();
+
+    $('slotStatus').textContent =
+        '格子 ' + (selectedSlotIndex + 1) + ' 已恢复默认位置。';
+});
+    renderResult();
+});
 $('download').onclick=()=>{if(!photos.length){alert('请先拍摄或上传照片。');return}renderResult();const a=document.createElement('a');a.download='little-moment-photo.png';a.href=canvas.toDataURL('image/png');a.click()};
 function resetAll(){stopCamera();photos=[];renderThumbs();canvas.style.display='none';$('previewArea').querySelector('.placeholder').style.display='block';$('previewArea').querySelector('.placeholder').textContent='你的成品会出现在这里 ♡\\n先拍摄或上传照片，再选择喜欢的设计。'}
 async function loadSiteSettings() {
