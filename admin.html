@@ -157,6 +157,50 @@ input[type="file"] { max-width: 100%; }
 </div>
 </section>
 
+  <section class="panel" id="siteManagement" style="display:none;">
+    <h2>04 / Website Management</h2>
+    <p>管理 mellow booth 的首页背景、音乐和文字内容。</p>
+
+    <h3>01. Background Management</h3>
+    <p>上传首页背景图片（JPG、PNG 或 WebP）。</p>
+    <input type="file" id="siteBackgroundFile" accept="image/jpeg,image/png,image/webp">
+    <div id="backgroundPreview" style="margin-top:15px;"></div>
+    <button id="uploadBackground">上传并启用背景</button>
+    <p class="status" id="backgroundStatus"></p>
+
+    <hr style="border:0;border-top:1px solid #f0dfe3;margin:25px 0;">
+
+    <h3>02. Music Management</h3>
+    <p>上传首页背景音乐（MP3、WAV 或 OGG）。访客需要点击播放才能听到音乐。</p>
+    <input type="file" id="siteMusicFile" accept="audio/mpeg,audio/wav,audio/ogg">
+    <br><br>
+    <audio id="musicPreview" controls style="width:100%;"></audio>
+    <br><br>
+    <button id="uploadMusic">上传音乐</button>
+    <button id="toggleMusic">启用 / 停用音乐</button>
+    <p class="status" id="musicStatus"></p>
+
+    <hr style="border:0;border-top:1px solid #f0dfe3;margin:25px 0;">
+
+    <h3>03. Homepage Text Management</h3>
+
+    <p>首页顶部小标题</p>
+    <input type="text" id="heroEyebrowInput" style="width:100%;">
+
+    <p>首页主标题</p>
+    <input type="text" id="heroTitleInput" style="width:100%;">
+
+    <p>首页介绍文字</p>
+    <textarea id="heroDescriptionInput" rows="3" style="width:100%;"></textarea>
+
+    <p>进入拍照亭按钮文字</p>
+    <input type="text" id="heroButtonInput" style="width:100%;">
+
+    <br><br>
+    <button id="saveHomepageText">保存首页文字</button>
+    <p class="status" id="homepageStatus"></p>
+  </section>
+
   <section class="panel" id="adminLogin">
   <h2>管理员登录</h2>
 
@@ -222,12 +266,241 @@ document.getElementById('loginButton').addEventListener('click', async () => {
         status.textContent = '管理员登录成功！';
 
         document.getElementById('adminLogin').style.display = 'none';
+        document.getElementById('siteManagement').style.display = 'block';
+        await loadSiteSettings();
 
-    } catch (error) {
-        isAdmin = false;
-        console.error('管理员登录失败：', error);
-        status.textContent = '登录失败：' + error.message;
+        } catch (error) {
+             isAdmin = false;
+             console.error('管理员登录失败：', error);
+             status.textContent = '登录失败：' + error.message;
     }
+    });
+
+async function loadSiteSettings() {
+    const { data, error } = await supabaseClient
+        .from('site_settings')
+        .select('*')
+        .eq('id', 'main')
+        .single();
+
+    if (error) {
+        console.error('读取网页设置失败：', error);
+        document.getElementById('homepageStatus').textContent =
+            '读取设置失败：' + error.message;
+        return;
+    }
+
+    // 读取首页文字
+    document.getElementById('heroEyebrowInput').value =
+        data.hero_eyebrow || '';
+
+    document.getElementById('heroTitleInput').value =
+        data.hero_title || '';
+
+    document.getElementById('heroDescriptionInput').value =
+        data.hero_description || '';
+
+    document.getElementById('heroButtonInput').value =
+        data.hero_button_text || '';
+
+    // 读取背景图片并显示预览
+    const backgroundPreview = document.getElementById('backgroundPreview');
+    backgroundPreview.innerHTML = '';
+
+    if (data.background_path) {
+        const { data: backgroundData } = supabaseClient
+            .storage
+            .from('site-assets')
+            .getPublicUrl(data.background_path);
+
+        const img = document.createElement('img');
+        img.src = backgroundData.publicUrl;
+        img.style.cssText =
+            'width:100%;max-width:400px;border-radius:12px;object-fit:cover;';
+
+        backgroundPreview.appendChild(img);
+    } else {
+        backgroundPreview.textContent = '目前还没有设置背景图片。';
+    }
+
+    // 读取音乐并显示试听
+    const musicPreview = document.getElementById('musicPreview');
+
+    if (data.music_path) {
+        const { data: musicData } = supabaseClient
+            .storage
+            .from('site-assets')
+            .getPublicUrl(data.music_path);
+
+        musicPreview.src = musicData.publicUrl;
+    } else {
+        musicPreview.removeAttribute('src');
+        musicPreview.load();
+    }
+
+    document.getElementById('toggleMusic').textContent =
+        data.music_enabled ? '停用音乐' : '启用音乐';
+}
+document.getElementById('uploadBackground').addEventListener('click', async () => {
+    const status = document.getElementById('backgroundStatus');
+    const fileInput = document.getElementById('siteBackgroundFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        status.textContent = '请先选择一张背景图片。';
+        return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        status.textContent = '请上传 JPG、PNG 或 WebP 格式的图片。';
+        return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+        status.textContent = '图片不能超过 8MB。';
+        return;
+    }
+
+    status.textContent = '正在上传，请稍候……';
+
+    const extension = file.name.split('.').pop().toLowerCase();
+    const filePath = `background/${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabaseClient
+        .storage
+        .from('site-assets')
+        .upload(filePath, file);
+
+    if (uploadError) {
+        status.textContent = '上传失败：' + uploadError.message;
+        return;
+    }
+
+    const { error: updateError } = await supabaseClient
+        .from('site_settings')
+        .update({
+            background_path: filePath,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', 'main');
+
+    if (updateError) {
+        status.textContent = '保存背景设置失败：' + updateError.message;
+        return;
+    }
+
+    status.textContent = '背景图片上传成功！';
+    await loadSiteSettings();
+});
+document.getElementById('uploadMusic').addEventListener('click', async () => {
+    const status = document.getElementById('musicStatus');
+    const fileInput = document.getElementById('siteMusicFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        status.textContent = '请先选择一首音乐。';
+        return;
+    }
+
+    if (!['audio/mpeg', 'audio/wav', 'audio/ogg'].includes(file.type)) {
+        status.textContent = '请上传 MP3、WAV 或 OGG 格式的音乐。';
+        return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+        status.textContent = '音乐文件不能超过 15MB。';
+        return;
+    }
+
+    status.textContent = '正在上传音乐，请稍候……';
+
+    const extension = file.name.split('.').pop().toLowerCase();
+    const filePath = `music/${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabaseClient
+        .storage
+        .from('site-assets')
+        .upload(filePath, file);
+
+    if (uploadError) {
+        status.textContent = '上传失败：' + uploadError.message;
+        return;
+    }
+
+    const { error: updateError } = await supabaseClient
+        .from('site_settings')
+        .update({
+            music_path: filePath,
+            music_enabled: true,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', 'main');
+
+    if (updateError) {
+        status.textContent = '保存音乐设置失败：' + updateError.message;
+        return;
+    }
+
+    status.textContent = '音乐上传成功！';
+    await loadSiteSettings();
+});
+document.getElementById('saveHomepageText').addEventListener('click', async () => {
+    const status = document.getElementById('homepageStatus');
+
+    const { error } = await supabaseClient
+        .from('site_settings')
+        .update({
+            hero_eyebrow: document.getElementById('heroEyebrowInput').value,
+            hero_title: document.getElementById('heroTitleInput').value,
+            hero_description: document.getElementById('heroDescriptionInput').value,
+            hero_button_text: document.getElementById('heroButtonInput').value,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', 'main');
+
+    if (error) {
+        status.textContent = '保存失败：' + error.message;
+        return;
+    }
+
+    status.textContent = '首页文字保存成功！';
+});
+document.getElementById('toggleMusic').addEventListener('click', async () => {
+    const status = document.getElementById('musicStatus');
+
+    const { data, error: readError } = await supabaseClient
+        .from('site_settings')
+        .select('music_enabled, music_path')
+        .eq('id', 'main')
+        .single();
+
+    if (readError) {
+        status.textContent = '读取音乐设置失败：' + readError.message;
+        return;
+    }
+
+    if (!data.music_path) {
+        status.textContent = '请先上传音乐文件。';
+        return;
+    }
+
+    const newStatus = !data.music_enabled;
+
+    const { error: updateError } = await supabaseClient
+        .from('site_settings')
+        .update({
+            music_enabled: newStatus,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', 'main');
+
+    if (updateError) {
+        status.textContent = '修改失败：' + updateError.message;
+        return;
+    }
+
+    status.textContent = newStatus ? '音乐已启用！' : '音乐已停用！';
+    await loadSiteSettings();
 });
 async function testLoadFilters() {
   const { data, error } = await supabaseClient

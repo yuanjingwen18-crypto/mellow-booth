@@ -34,7 +34,21 @@ footer{text-align:center;color:#aa9da0;font-size:11px;padding:24px}
 <body>
 <header><div class="logo">Mellow Booth.<small>YOUR LITTLE PHOTO STUDIO</small></div><nav><span onclick="scrollTo({top:0,behavior:'smooth'})">STUDIO</span><span onclick="document.getElementById('editor').scrollIntoView({behavior:'smooth'})">EDIT</span><span onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">ABOUT</span></nav><button class="tiny soft" onclick="resetAll()">重新开始 ↻</button></header>
 <main>
-<section class="hero"><div class="eyebrow">WELCOME TO MALLOW BOOTH PHOTO STUDIO</div><h1>Your Mellow Booth, forever.</h1><p>一个属于你的线上拍照空间。选择喜欢的滤镜与相框，记录每一个可爱的瞬间。</p><button onclick="document.getElementById('studio').scrollIntoView({behavior:'smooth'})">进入拍照亭　↓</button></section>
+<section class="hero">
+    <div class="eyebrow" id="heroEyebrow">
+        WELCOME TO MELLOW BOOTH PHOTO STUDIO
+    </div>
+
+    <h1 id="heroTitle">Your Mellow Booth, forever.</h1>
+
+    <p id="heroDescription">
+        一个属于你的线上拍照空间。选择喜欢的滤镜与相框，记录每一个可爱的瞬间。
+    </p>
+
+    <button id="heroButton" onclick="document.getElementById('studio').scrollIntoView({behavior:'smooth'})">
+        进入拍照亭　↓
+    </button>
+</section>
 <div class="workspace" id="studio">
 <section class="panel">
 <h2>01 / Camera Studio <span style="font-size:11px;color:#b5a8aa;font-weight:400">拍摄或上传照片</span></h2>
@@ -777,7 +791,104 @@ if (selectedCloudFrame && selectedCloudFrame.img) {
 
 $('download').onclick=()=>{if(!photos.length){alert('请先拍摄或上传照片。');return}renderResult();const a=document.createElement('a');a.download='little-moment-photo.png';a.href=canvas.toDataURL('image/png');a.click()};
 function resetAll(){stopCamera();photos=[];renderThumbs();canvas.style.display='none';$('previewArea').querySelector('.placeholder').style.display='block';$('previewArea').querySelector('.placeholder').textContent='你的成品会出现在这里 ♡\\n先拍摄或上传照片，再选择喜欢的设计。'}
+async function loadSiteSettings() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('site_settings')
+            .select('*')
+            .eq('id', 'main')
+            .single();
+
+        if (error) throw error;
+
+        // 更新首页小标题
+        if (data.hero_eyebrow) {
+            $('heroEyebrow').textContent = data.hero_eyebrow;
+        }
+
+        // 更新首页主标题
+        if (data.hero_title) {
+            $('heroTitle').textContent = data.hero_title;
+        }
+
+        // 更新首页介绍
+        if (data.hero_description) {
+            $('heroDescription').textContent = data.hero_description;
+        }
+
+        // 更新首页按钮文字
+        if (data.hero_button_text) {
+            $('heroButton').textContent = data.hero_button_text;
+        }
+// 更新网站背景图片
+if (data.background_path) {
+    const { data: backgroundData } = supabaseClient
+        .storage
+        .from('site-assets')
+        .getPublicUrl(data.background_path);
+
+    document.body.style.backgroundImage =
+        `url("${backgroundData.publicUrl}")`;
+
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+    document.body.style.backgroundRepeat = 'no-repeat';
+}
+// 读取并设置网站背景音乐
+const musicControl = $('siteMusicControl');
+const musicPlayer = $('siteMusicPlayer');
+
+if (data.music_enabled && data.music_path) {
+    const { data: musicData } = supabaseClient
+        .storage
+        .from('site-assets')
+        .getPublicUrl(data.music_path);
+
+    musicPlayer.src = musicData.publicUrl;
+    musicControl.style.display = 'block';
+} else {
+    musicControl.style.display = 'none';
+    musicPlayer.pause();
+    musicPlayer.removeAttribute('src');
+}
+    } catch (error) {
+        console.error('读取首页设置失败：', error);
+    }
+}
+loadSiteSettings();
 loadCloudFrames();
 loadCloudFilters();
+</script>
+<!-- 网站背景音乐播放器 -->
+<div id="siteMusicControl"
+     style="display:none; position:fixed; right:20px; bottom:20px; z-index:9999;">
+
+    <audio id="siteMusicPlayer" loop></audio>
+
+
+    <button id="siteMusicButton" type="button">
+        ♫ 播放背景音乐
+    </button>
+
+</div>
+    <script>
+document.getElementById('siteMusicButton').addEventListener('click', async () => {
+    const audio = document.getElementById('siteMusicPlayer');
+    const button = document.getElementById('siteMusicButton');
+
+    if (audio.paused) {
+        try {
+            await audio.play();
+            button.textContent = 'Ⅱ 暂停背景音乐';
+        } catch (error) {
+            console.error('音乐播放失败：', error);
+            button.textContent = '播放失败，请重试';
+        }
+    } else {
+        audio.pause();
+        button.textContent = '♫ 播放背景音乐';
+    }
+});
 </script>
 </body></html>
